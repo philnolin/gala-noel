@@ -116,7 +116,6 @@
   <div class="hbar">
     <span>🏆 <b>Gala des prix</b> — écran animateur</span>
     <span id="hconn">Connexion…</span>
-    <span>Téléphones connectés : <b id="hpeople">0</b></span>
     <span class="sp"></span>
     <button class="hbtn" id="bList">☰ Catégories</button>
     <button class="hbtn" id="bHome">Accueil / code QR</button>
@@ -361,7 +360,6 @@ function startHost() {
   const voterUrl = location.origin + location.pathname + (TEST ? "?test" : "");
   let state = load("hstate", { q: -1, open: false, reveal: false });
   let votes = load("hvotes", {});           // votes[q][device] = nom
-  let seen = {};                            // device -> dernière activité
   const tr = makeTransport(onMsg, (st) => {
     $("hconn").innerHTML = st.map((on, k) => (on ? "🟢" : "🔴") + " serveur " + (k + 1)).join(" &nbsp; ");
     if (st.some(Boolean)) pubState();
@@ -369,10 +367,8 @@ function startHost() {
   tr.sub(T("vote")); tr.sub(T("hello"));
   function pubState() { tr.pub(T("state"), { q: state.q, open: state.open, reveal: state.reveal, t: Date.now() }, { retain: true }); }
   setInterval(pubState, 15000);
-  setInterval(() => { const now = Date.now(); $("hpeople").textContent = Object.values(seen).filter((t) => now - t < 60000).length; }, 2000);
   function onMsg(t, p) {
     if (!p || !p.d) return;
-    seen[p.d] = Date.now();
     if (t === T("vote")) {
       const q = p.q;
       if (typeof q !== "number" || !CATS[q]) return;
