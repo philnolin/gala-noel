@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Gala des prix – Party de Noël 2026</title>
+<script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js"></script>
+<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js"></script>
+<script>
+  if(!window.mqtt)document.write('<script src="https://cdn.jsdelivr.net/npm/mqtt@5/dist/mqtt.min.js"><\/script>');
+  if(!window.qrcode)document.write('<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"><\/script>');
+</script>
+<style>
+  :root{--green:#143D2E;--dark:#0E2A20;--red:#C8102E;--gold:#F2C14E;--cream:#F7F1E3;--muted:#9FB8AC}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--dark);color:#fff;font-family:Calibri,"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif}
+  h1,h2,.serif{font-family:Cambria,Georgia,"Times New Roman",serif}
+  button{font:inherit;cursor:pointer}
+  .hidden{display:none!important}
+
+  /* ---------- Téléphone ---------- */
+  #voter{max-width:560px;margin:0 auto;min-height:100%;padding:18px 16px 40px;display:flex;flex-direction:column}
+  .vhead{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .vhead .logo{font-size:26px}
+  .vhead .t{font-family:Cambria,Georgia,serif;font-size:20px;font-weight:700}
+  .vhead .s{font-size:13px;color:var(--gold)}
+  .dot{width:10px;height:10px;border-radius:50%;background:#777;display:inline-block;margin-left:auto}
+  .dot.on{background:#3DDC84}
+  .card{background:var(--green);border-radius:18px;padding:20px 18px;margin-top:6px}
+  .grp{font-size:13px;color:var(--gold);text-transform:uppercase;letter-spacing:.06em}
+  .prize{font-family:Cambria,Georgia,serif;font-size:26px;font-weight:700;margin:6px 0 6px;line-height:1.15}
+  .desc{color:var(--cream);font-size:16px;line-height:1.35;margin-bottom:16px}
+  .opt{display:flex;align-items:center;width:100%;text-align:left;background:#fff;color:var(--dark);border:3px solid transparent;border-radius:14px;padding:15px 16px;margin:9px 0;font-size:18px;font-weight:600;transition:transform .08s}
+  .opt:active{transform:scale(.98)}
+  .opt .chk{margin-left:auto;font-size:20px;color:var(--red);visibility:hidden}
+  .opt.sel{border-color:var(--gold);background:#FFF6DA}
+  .opt.sel .chk{visibility:visible}
+  .opt small{font-weight:400;color:#557;margin-left:8px;font-size:13px}
+  #search{width:100%;padding:13px 14px;border-radius:12px;border:none;font-size:17px;margin-bottom:4px}
+  .status{margin-top:14px;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.08);font-size:16px;text-align:center}
+  .status.ok{background:rgba(61,220,132,.18);color:#BDF5D3}
+  .wait{text-align:center;padding:50px 10px}
+  .wait .big{font-size:64px;margin-bottom:10px}
+  .wait .msg{font-family:Cambria,Georgia,serif;font-size:24px}
+  .wait .sub{color:var(--muted);margin-top:8px;font-size:15px}
+  .foot{margin-top:auto;padding-top:24px;text-align:center;color:var(--muted);font-size:12px}
+
+  /* ---------- Écran animateur ---------- */
+  #host{height:100%;display:flex;flex-direction:column}
+  .hbar{display:flex;align-items:center;gap:16px;padding:10px 22px;background:#0A2018;font-size:14px;color:var(--muted)}
+  .hbar b{color:#fff}
+  .hbar .sp{flex:1}
+  .hbtn{background:rgba(255,255,255,.1);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:14px}
+  .hbtn:hover{background:rgba(255,255,255,.18)}
+  .hmain{flex:1;display:flex;min-height:0}
+  #list{width:330px;background:#0A2018;overflow:auto;padding:10px;border-right:1px solid rgba(255,255,255,.06)}
+  #list .li{padding:8px 10px;border-radius:8px;font-size:14px;cursor:pointer;color:var(--cream);display:flex;gap:8px}
+  #list .li:hover{background:rgba(255,255,255,.07)}
+  #list .li.cur{background:var(--red);color:#fff}
+  #list .li .n{color:var(--muted);min-width:24px}
+  #list .li.cur .n{color:#fff}
+  #list .li .v{margin-left:auto;color:var(--gold);font-size:12px}
+  #list .lg{font-size:11px;text-transform:uppercase;color:var(--gold);margin:14px 10px 4px;letter-spacing:.06em}
+  .stage{flex:1;position:relative;padding:34px 48px 120px;overflow:auto}
+  .stage .grp{font-size:18px}
+  .stage .prize{font-size:52px;margin:8px 0 6px;max-width:1100px}
+  .stage .desc{font-size:24px;max-width:1100px;margin-bottom:26px}
+  .pill{display:inline-block;padding:6px 14px;border-radius:999px;font-size:16px;font-weight:700;margin-right:10px}
+  .pill.open{background:#3DDC84;color:#08321F}
+  .pill.closed{background:rgba(255,255,255,.12);color:var(--cream)}
+  .pill.cnt{background:var(--gold);color:var(--dark)}
+  .bars{max-width:1100px;margin-top:18px}
+  .bar{display:flex;align-items:center;gap:16px;margin:12px 0}
+  .bar .nm{width:300px;font-size:24px;font-weight:600;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bar .trk{flex:1;height:46px;background:rgba(255,255,255,.07);border-radius:12px;overflow:hidden}
+  .bar .fill{height:100%;background:var(--cream);border-radius:12px;width:0;transition:width .7s cubic-bezier(.2,.8,.2,1)}
+  .bar .num{width:70px;font-size:26px;font-weight:700;color:var(--gold)}
+  .bar.win .fill{background:var(--gold)}
+  .bar.win .nm{color:var(--gold)}
+  .bar.hide .fill{width:0!important}
+  .winner{margin-top:26px;font-family:Cambria,Georgia,serif;font-size:44px;color:var(--gold)}
+  .qrbox{position:absolute;right:28px;bottom:24px;background:#fff;border-radius:14px;padding:10px 10px 6px;text-align:center;color:var(--dark);font-size:13px;font-weight:700}
+  .qrbox svg{display:block;width:150px;height:150px}
+  .ctrls{position:absolute;left:48px;bottom:30px;display:flex;gap:12px}
+  .cbtn{border:none;border-radius:14px;padding:14px 22px;font-size:19px;font-weight:700}
+  .cbtn.pri{background:var(--red);color:#fff}
+  .cbtn.gold{background:var(--gold);color:var(--dark)}
+  .cbtn.sec{background:rgba(255,255,255,.12);color:#fff}
+  /* Accueil */
+  .welcome{display:flex;align-items:center;justify-content:center;gap:70px;height:100%;padding:30px}
+  .welcome h1{font-size:72px;margin:0 0 10px}
+  .welcome .gold{color:var(--gold);font-style:italic;font-size:42px;font-family:Cambria,Georgia,serif}
+  .welcome p{font-size:24px;color:var(--cream);max-width:560px}
+  .welcome .bigqr{background:#fff;border-radius:22px;padding:18px;text-align:center;color:var(--dark)}
+  .welcome .bigqr svg{width:340px;height:340px;display:block}
+  .welcome .url{font-size:15px;margin-top:8px;word-break:break-all;max-width:340px}
+  .snow{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
+</style>
+</head>
+<body>
+
+<!-- ======================= VOTANT ======================= -->
+<div id="voter" class="hidden">
+  <div class="vhead">
+    <div class="logo">🏆</div>
+    <div><div class="t">Gala des prix</div><div class="s">Party de Noël · GMF Cité-Verte</div></div>
+    <span class="dot" id="vdot" title="Connexion"></span>
+  </div>
+  <div id="vwait" class="wait">
+    <div class="big">🎄</div>
+    <div class="msg" id="vwaitMsg">Connexion en cours…</div>
+    <div class="sub" id="vwaitSub">Gardez cette page ouverte : les catégories s'afficheront ici.</div>
+  </div>
+  <div id="vq" class="card hidden">
+    <div class="grp" id="vgrp"></div>
+    <div class="prize" id="vprize"></div>
+    <div class="desc" id="vdesc"></div>
+    <input id="search" class="hidden" type="search" placeholder="Rechercher un nom…" autocomplete="off">
+    <div id="vopts"></div>
+    <div class="status" id="vstatus">Touchez un nom pour voter. Vous pouvez changer d'idée tant que le vote est ouvert.</div>
+  </div>
+  <div class="foot">Vote anonyme · un vote par téléphone par catégorie</div>
+</div>
+
+<!-- ======================= ANIMATEUR ======================= -->
+<div id="host" class="hidden">
+  <div class="hbar">
+    <span>🏆 <b>Gala des prix</b> — écran animateur</span>
+    <span id="hconn">Connexion…</span>
+    <span>Téléphones connectés : <b id="hpeople">0</b></span>
+    <span class="sp"></span>
+    <button class="hbtn" id="bList">☰ Catégories</button>
+    <button class="hbtn" id="bHome">Accueil / code QR</button>
+    <button class="hbtn" id="bLive">Résultats en direct : non</button>
+    <button class="hbtn" id="bCsv">Exporter (CSV)</button>
+    <button class="hbtn" id="bFull">Plein écran</button>
+  </div>
+  <div class="hmain">
+    <div id="list" class="hidden"></div>
+    <div class="stage" id="stage"></div>
+  </div>
+</div>
+
+<script>
+const DATA = {
+"room": "gmfcv-noel26-9cdc1209",
+
+/* ===== CATÉGORIES : "p" = nom du prix, "d" = description, "n" = personnes nommées (2 ou plus) ===== */
+"cats": [
+  {"g": "Les vedettes du secrétariat", "p": "Le prix du téléphone greffé à l'oreille", "d": "Celle qui répond à 3 lignes en même temps.", "s": false, "n": ["Kathy"]},
+  {"g": "Les vedettes du secrétariat", "p": "Le prix de la patience légendaire", "d": "Celle qui pourrait garder son calme devant n'importe quel patient.", "s": false, "n": ["Laurence", "Laurianne", "Kathy"]},
+  {"g": "Les vedettes du secrétariat", "p": "Le prix de la pieuvre administrative", "d": "Celle qui réussit à faire 12 choses simultanément.", "s": false, "n": ["Laurianne", "Charlotte", "Nicole"]},
+  {"g": "Les vedettes du secrétariat", "p": "Le prix du radar humain", "d": "Celle qui sait toujours ce qui se passe dans la clinique.", "s": false, "n": ["Chantal"]},
+  {"g": "Les vedettes du secrétariat", "p": "Le prix de la mémoire médicale", "d": "Celle qui connaît les dossiers, les médecins et les procédures par cœur.", "s": false, "n": ["Carole", "Laurence", "Chantal"]},
+  {"g": "Les vedettes du secrétariat", "p": "Le prix de la ninja du secrétariat", "d": "Celle qui règle les problèmes avant même qu'on les remarque.", "s": false, "n": ["Laurence"]},
+  {"g": "Les vedettes du secrétariat", "p": "Le prix du sang-froid olympique", "d": "Celle qui reste zen même quand tout explose.", "s": false, "n": ["Caroline", "Danièle", "Kathy"]},
+  {"g": "Les vedettes du secrétariat", "p": "Le prix du sourire professionnel", "d": "Celle qui garde son plus beau sourire même après le 42e appel.", "s": false, "n": ["Danièle", "Caroline", "Laurianne", "Noémie"]},
+  {"g": "Les vedettes du secrétariat", "p": "Le prix du rendez-vous impossible", "d": "Celle qui réussit à faire entrer un rendez-vous dans un agenda déjà complet.", "s": false, "n": ["Kathy"]},
+  {"g": "Les vedettes du secrétariat", "p": "Le prix de la survivante de l'apocalypse", "d": "Pour celle qui a traversé les journées les plus chaotiques sans perdre la tête.", "s": false, "n": ["Nicole"]},
+  {"g": "Les vedettes du secrétariat", "p": "Le prix de la téléportation", "d": "Celle qui semble être partout en même temps.", "s": false, "n": ["Laurence"]},
+  {"g": "Les vedettes du secrétariat", "p": "Le prix de la magicienne de l'agenda", "d": "Celle qui trouve un rendez-vous même quand il n'y a plus aucune disponibilité.", "s": false, "n": ["Danièle", "Kathy"]},
+  {"g": "Les vedettes du secrétariat", "p": "Le prix du mode multitâche extrême", "d": "Celle qui peut parler au téléphone, répondre à un courriel et gérer un patient simultanément.", "s": false, "n": ["Nicole"]},
+  {"g": "Les vedettes du secrétariat", "p": "La diplomate nucléaire", "d": "L'art de gérer les situations délicates.", "s": false, "n": ["Nicole", "Kathy"]},
+  {"g": "Catégories loufoques – Les Oscars des infirmières", "p": "Le prix de l'œil de lynx", "d": "Celle qui remarque le moindre petit changement chez un patient.", "s": false, "n": []},
+  {"g": "Catégories loufoques – Les Oscars des infirmières", "p": "Le prix de la pieuvre clinique", "d": "Celle qui fait 10 choses en même temps sans perdre le fil.", "s": false, "n": []},
+  {"g": "Catégories loufoques – Les Oscars des infirmières", "p": "Le prix du sang-froid légendaire", "d": "Celle qui reste calme même quand tout le monde panique.", "s": false, "n": ["Élisabeth", "Marie-Élise D.", "Marie-Josée"]},
+  {"g": "Catégories loufoques – Les Oscars des infirmières", "p": "Le prix de la mémoire encyclopédique", "d": "Celle qui connaît les protocoles, les médicaments et les histoires de patients par cœur.", "s": false, "n": ["Marie-Josée"]},
+  {"g": "Catégories loufoques – Les Oscars des infirmières", "p": "Le prix de la détective médicale", "d": "Celle qui finit toujours par trouver ce qui se cache derrière les symptômes.", "s": false, "n": []},
+  {"g": "Catégories loufoques – Les Oscars des infirmières", "p": "Le prix de la reine de l'organisation", "d": "Celle qui a toujours un plan, un tableau et une solution.", "s": false, "n": ["Valérie"]},
+  {"g": "Catégories loufoques – Les Oscars des infirmières", "p": "Le prix du « Ça va prendre juste une petite minute »", "d": "Pour celle dont la petite minute dure parfois 45 minutes.", "s": false, "n": ["Sabrina"]},
+  {"g": "Catégories loufoques – Les Oscars des infirmières", "p": "Le prix du téléphone rouge", "d": "Celle que tout le monde appelle pour régler les problèmes.", "s": false, "n": []},
+  {"g": "Catégories loufoques – Les Oscars des infirmières", "p": "Le prix de la maman de la clinique", "d": "Celle qui prend soin de tout le monde, patients et collègues inclus.", "s": false, "n": []},
+  {"g": "Catégories loufoques – Les Oscars des infirmières", "p": "Le prix de la psy improvisée", "d": "Celle qui reçoit toutes les confidences, même celles qui n'étaient pas prévues.", "s": false, "n": ["Sophie"]},
+  {"g": "Les Oscars médicaux – Catégories loufoques", "p": "Le prix du Dr House", "d": "Celui qui finit toujours par trouver le diagnostic auquel personne n'avait pensé.", "s": true, "n": ["Dr Boudreau", "Dre Boudreau"]},
+  {"g": "Les Oscars médicaux – Catégories loufoques", "p": "Le prix du dictionnaire médical ambulant", "d": "Celui qui connaît tous les termes médicaux, même ceux que personne ne sait prononcer.", "s": false, "n": ["Dr Boudreau", "Dre Boudreau"]},
+  {"g": "Les Oscars médicaux – Catégories loufoques", "p": "Le prix du Sherlock Holmes médical", "d": "Celui qui enquête sur chaque symptôme comme s'il résolvait un meurtre.", "s": false, "n": ["Dr Boudreau", "Dre Boudreau", "Élisabeth M.", "Jean"]},
+  {"g": "Les Oscars médicaux – Catégories loufoques", "p": "Le prix du diagnostic express", "d": "Celui qui semble avoir déjà tout compris en 30 secondes.", "s": false, "n": ["Stefan"]},
+  {"g": "Les Oscars médicaux – Catégories loufoques", "p": "Le prix du « On va surveiller ça »", "d": "Celui pour qui cette phrase est une véritable signature.", "s": false, "n": ["Dr Brouw", "Dr Drouin"]},
+  {"g": "Les Oscars médicaux – Catégories loufoques", "p": "Le prix du marathon des consultations", "d": "Celui qui enchaîne les patients sans jamais voir la lumière du jour.", "s": false, "n": ["Dr Drouin"]},
+  {"g": "Les Oscars médicaux – Catégories loufoques", "p": "Le prix du médecin Google", "d": "Celui qui connaît toutes les dernières études et recommandations.", "s": false, "n": ["Dr Boudreau", "Dre Boudreau", "Dre Thériault", "Dre Fiset"]},
+  {"g": "Les Oscars médicaux – Catégories loufoques", "p": "Le prix du professeur Tournesol", "d": "Celui qui part dans des explications scientifiques passionnantes… mais parfois interminables.", "s": false, "n": ["Dr Boudreau"]},
+  {"g": "Les Oscars médicaux – Catégories loufoques", "p": "Le prix du roi ou de la reine du retard", "d": "Celui dont l'horaire est davantage une suggestion qu'une réalité.", "s": false, "n": ["Dr Drouin", "Dre Boudreau"]},
+  {"g": "Les Oscars médicaux – Catégories loufoques", "p": "Le prix du poker face médical", "d": "Celui qui réussit à garder son sérieux devant les situations les plus improbables.", "s": false, "n": []},
+  {"g": "Les Oscars médicaux – Catégories loufoques", "p": "Le prix du « Peux-tu juste me faire une faveur ? »", "d": "Celui qui a toujours une petite demande pour le secrétariat.", "s": false, "n": ["Dr Drouin", "Dr Brouw", "Dr Denis"]},
+  {"g": "Les Oscars médicaux – Catégories loufoques", "p": "Le prix de la collaboration interdisciplinaire", "d": "Celui qui consulte toujours ses collègues et valorise leurs expertises.", "s": false, "n": ["Dr Brouw", "Marie-Pascale", "Hélène B.", "Dre Boudreau", "Dr Boudreau", "Geneviève", "Dominique"]},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le prix du « Je vais m'en occuper »", "d": "Celle qui finit toujours par tout prendre en charge.", "s": true, "n": ["Laurence", "Nicole", "Jean Drouin", "Dominique", "Philippe"]},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le prix du radar à problèmes", "d": "Celle qui détecte une urgence à 10 km.", "s": false, "n": []},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le prix du café intraveineux", "d": "Celle qui ne fonctionne pas sans caféine.", "s": false, "n": []},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le prix de la disparition mystérieuse", "d": "Celle qu'on cherche partout dans la clinique.", "s": false, "n": []},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le prix du plus grand poker face", "d": "Celle qui ne laisse jamais paraître ce qu'elle pense réellement.", "s": true, "n": ["Sophie", "Marie-Élise D.", "Caroline Boulay", "M-Hélène Boudreau", "Marie-Line"]},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le prix du couteau suisse humain", "d": "Celle qui sait tout faire, même ce qui ne relève pas de son poste.", "s": true, "n": ["Laurence", "Philippe", "Chantal"]},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le prix du meilleur duo de choc", "d": "Deux collègues qui forment une équipe redoutable.", "s": false, "n": ["Kathy et Laurence", "Dre Fiset et Dre Marcoux", "Nancy et Chantal"]},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le prix de la survivante de l'année", "d": "Celle qui a traversé toutes les tempêtes.", "s": false, "n": ["Laurence", "Nicole", "Carole"]},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le prix du sauveur de dernière minute", "d": "La personne qui sort toujours l'équipe du pétrin.", "s": false, "n": ["Charlotte", "Laurianne", "Noémie", "Maude"]},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le prix de la personnalité incontournable", "d": "Celle sans qui la clinique ne serait tout simplement pas la même.", "s": false, "n": ["Laurence", "Nicole Lacasse"]},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le mentor naturel", "d": "toujours prêt à transmettre ses connaissances.", "s": true, "n": ["Dr B Boudreau", "Marie-Élise D.", "Laurence", "Catherine"]},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le meilleur esprit d'équipe", "d": "rassemble les gens.", "s": false, "n": ["Dr Drouin", "Stefan", "Andréa", "Philippe", "Geneviève"]},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le pilier de l'équipe", "d": "toujours présent pour les autres.", "s": false, "n": ["Laurence", "Chantal", "Marie-Line", "Andréa", "Nicole Côté", "Lise"]},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le cœur sur la main", "d": "toujours prêt à aider.", "s": true, "n": ["Dr Drouin", "Marie-Élise D.", "Marie-Line", "Andréa", "Caroline Boulay", "Kathy"]},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le prix du calme olympien", "d": "Rien ne semble pouvoir la déstabiliser.", "s": true, "n": ["Élisabeth Marcoux", "Élisabeth Cauchon", "Anne-Marie Giroux", "Bruno"]},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le prix du moine tibétain", "d": "Une sérénité presque surnaturelle.", "s": false, "n": ["Jean Drouin", "Anne-Marie Giroux", "Charlotte"]},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le prix du sang-froid légendaire", "d": "Là où les autres paniquent, elle respire.", "s": false, "n": ["Laurence", "Anne-Marie Giroux", "Nicole Côté", "Maude"]},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le prix du lac tranquille", "d": "Une surface toujours calme, même si ça brasse en dessous.", "s": false, "n": ["Élisabeth Marcoux", "Marie-Line", "Lise", "Mélissa-Ann", "Noémie", "Anne-Marie"]},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le prix de l'énergie contagieuse", "d": "Celle dont l'enthousiasme est impossible à ignorer.", "s": false, "n": ["Dr Drouin", "Nancy", "Caroline"]},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le prix du champagne pétillant", "d": "Toujours effervescente, jamais fade !", "s": false, "n": ["Dr Drouin", "Caroline Fiset", "Andréa", "Caroline Boulay", "Fabiola"]},
+  {"g": "Quelques catégories communes à toutes les professions", "p": "Le prix du micro toujours ouvert", "d": "Celle qui a toujours une histoire à raconter.", "s": false, "n": ["Bernard", "Fabiola", "Valérie", "Nancy"]},
+  {"g": "Les catégories les plus originales pour les TS", "p": "Le prix de Madame Solutions", "d": "Celle qui trouve une solution même quand il n'y en a pas.", "s": false, "n": ["Dominic", "Dominique", "Catherine"]},
+  {"g": "Les catégories les plus originales pour les TS", "p": "Le prix du dossier à épisodes", "d": "Un dossier qui pourrait avoir 12 saisons sur Netflix.", "s": false, "n": []},
+  {"g": "Les catégories les plus originales pour les TS", "p": "Le prix du transfert de patate chaude", "d": "Celle qui reçoit les références que personne ne sait où envoyer.", "s": false, "n": []},
+  {"g": "Les catégories les plus originales pour les TS", "p": "Le prix de la travailleuse sociale aux mille chapeaux", "d": "Celle qui passe de la médiatrice à l'enquêtrice, puis à la négociatrice dans la même journée.", "s": false, "n": ["Catherine"]},
+  {"g": "Les catégories les plus originales pour les TS", "p": "Le prix du cerveau en mode 47 onglets ouverts", "d": "Celle qui pense à tout, tout le temps.", "s": false, "n": ["Dominique"]}
+],
+
+/* ===== LISTE COMPLÈTE DE L'ÉQUIPE (utilisée quand une catégorie a 0 ou 1 personne nommée) ===== */
+"staff": [
+  ["Hélène Bélanger", "Médecins"],
+  ["Catherine Barrette", "TS"],
+  ["Carole Bonsaint", "Admin"],
+  ["Élisabeth Cauchon", "Infirmières"],
+  ["Philippe Nolin-Grondin", "Pharmaciens / autres"],
+  ["René Gagnon", "Retraités"],
+  ["Bernard Boudreau", "Médecins"],
+  ["Dominique D'Anjou", "TS"],
+  ["Caroline Boulay", "Admin"],
+  ["Valérie Damien", "Infirmières"],
+  ["Mélissa-Ann Morin", "Pharmaciens / autres"],
+  ["Marie-Hélène Boudreau", "Médecins"],
+  ["Dominic Roy", "TS"],
+  ["Lise Thériault", "Médecins"],
+  ["Nancy Beninga", "Admin"],
+  ["Marie-Élise Dunningan", "Infirmières"],
+  ["Fabiola", "Pharmaciens / autres"],
+  ["Marc Allard", "Retraités"],
+  ["Stefan Brouw", "Médecins"],
+  ["Chantal Desbiens", "Admin"],
+  ["Marie-Josée Lalancette", "Infirmières"],
+  ["Denis Bédard", "Retraités"],
+  ["Nicole Côté", "Médecins"],
+  ["Noémie Gagné", "Admin"],
+  ["Sabrina Laroche", "Infirmières"],
+  ["Marie-Pascale Côté", "Médecins"],
+  ["Charlotte Guay", "Admin"],
+  ["Sophie Martineau", "Infirmières"],
+  ["Jean Drouin", "Médecins"],
+  ["Marie-Line Harvey", "Admin"],
+  ["Caroline Fiset", "Médecins"],
+  ["Nicole Lacasse", "Admin"],
+  ["Geneviève Gagnon", "Médecins"],
+  ["Kathy Tremblay", "Admin"],
+  ["Anne-Marie Giroux", "Médecins"],
+  ["Laurianne Quirion", "Admin"],
+  ["Andréa Jean", "Médecins"],
+  ["Danièle Roy", "Admin"],
+  ["Élisabeth Marcoux", "Médecins"],
+  ["Laurence Luneau", "Admin"]
+]
+};
+const ROOM = DATA.room;
+const BROKERS = ["wss://broker.hivemq.com:8884/mqtt", "wss://broker.emqx.io:8084/mqtt"];
+const qs = new URLSearchParams(location.search);
+const TEST = qs.has("test");
+const IS_HOST = location.hash.toLowerCase().includes("animateur") || qs.get("mode") === "animateur";
+const CATS = DATA.cats;
+const STAFF = DATA.staff;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function load(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
+function optionsFor(i) { const c = CATS[i]; return c.n.length >= 2 ? c.n.map((n) => ({ name: n })) : STAFF.map((s) => ({ name: s[0], sub: s[1] })); }
+const usesStaff = (i) => CATS[i].n.length < 2;
+
+/* ---------------- Transport (2 serveurs MQTT publics + mode test) ---------------- */
+function makeTransport(onMsg, onStatus) {
+  const subs = [];
+  if (TEST) {
+    const bc = new BroadcastChannel("vote-test-" + ROOM);
+    bc.onmessage = (e) => { const { t, p } = e.data; if (subs.some((s) => match(s, t))) onMsg(t, p); };
+    setTimeout(() => onStatus([true]), 50);
+    return {
+      sub(t) { subs.push(t); const r = load("ret:" + t, null); if (r) setTimeout(() => onMsg(t, r), 60); },
+      pub(t, p, o = {}) { if (o.retain) store("ret:" + t, p); bc.postMessage({ t, p }); },
+    };
+  }
+  const st = BROKERS.map(() => false);
+  const clients = BROKERS.map((url, i) => {
+    const c = mqtt.connect(url, { clientId: "gmf" + Math.random().toString(16).slice(2, 12), clean: true, reconnectPeriod: 2000, connectTimeout: 8000, keepalive: 30 });
+    c.on("connect", () => { st[i] = true; onStatus(st.slice()); subs.forEach((t) => c.subscribe(t, { qos: 1 })); });
+    c.on("close", () => { st[i] = false; onStatus(st.slice()); });
+    c.on("offline", () => { st[i] = false; onStatus(st.slice()); });
+    c.on("error", () => {});
+    c.on("message", (t, payload) => { try { onMsg(t, JSON.parse(payload.toString())); } catch (e) {} });
+    return c;
+  });
+  return {
+    sub(t) { subs.push(t); clients.forEach((c) => c.connected && c.subscribe(t, { qos: 1 })); },
+    pub(t, p, o = {}) { const s = JSON.stringify(p); clients.forEach((c) => { if (c.connected) c.publish(t, s, { qos: 1, retain: !!o.retain }); }); },
+  };
+}
+function match(pattern, t) { return pattern.endsWith("#") ? t.startsWith(pattern.slice(0, -1)) : pattern === t; }
+const T = (x) => ROOM + "/" + x;
+
+/* ================================== VOTANT ================================== */
+function startVoter() {
+  $("voter").classList.remove("hidden");
+  let dev = qs.get("dev") || load("dev", null); if (!dev) { dev = "d" + Math.random().toString(36).slice(2, 10); store("dev", dev); }
+  let state = null, myVotes = load("myVotes" + dev, {}), acked = load("acked" + dev, {}), resendTimer = null;
+  const tr = makeTransport(onMsg, (st) => {
+    const on = st.some(Boolean); $("vdot").classList.toggle("on", on);
+    if (on && !state) { $("vwaitMsg").textContent = "Connecté ✓"; $("vwaitSub").textContent = "En attente de la première catégorie…"; }
+    if (on) { hello(); resend(); }
+  });
+  tr.sub(T("state")); tr.sub(T("ack/" + dev));
+  function hello() { tr.pub(T("hello"), { d: dev }); }
+  setInterval(hello, 20000);
+  function onMsg(t, p) {
+    if (t === T("state")) { state = p; render(); resend(); }
+    else if (t === T("ack/" + dev)) { acked[p.q] = p.c; store("acked" + dev, acked); render(false); }
+  }
+  function resend() {
+    clearTimeout(resendTimer);
+    if (!state || !state.open) return;
+    const q = state.q, c = myVotes[q];
+    if (c != null && acked[q] !== c) { tr.pub(T("vote"), { d: dev, q, c }); resendTimer = setTimeout(resend, 3000); }
+  }
+  function vote(name) {
+    if (!state || !state.open) return;
+    myVotes[state.q] = name; store("myVotes" + dev, myVotes);
+    render(false); resend();
+  }
+  let lastQ = null;
+  function render(full = true) {
+    if (!state || state.q == null || state.q < 0) {
+      $("vq").classList.add("hidden"); $("vwait").classList.remove("hidden");
+      $("vwaitMsg").textContent = "Bienvenue au Gala ! 🎉"; $("vwaitSub").textContent = "Gardez cette page ouverte : la première catégorie arrive bientôt.";
+      return;
+    }
+    const i = state.q, c = CATS[i];
+    if (!state.open && myVotes[i] == null) {
+      $("vq").classList.add("hidden"); $("vwait").classList.remove("hidden");
+      $("vwaitMsg").textContent = state.reveal ? "Les résultats sont à l'écran ! 👀" : "Prochaine catégorie : " + c.p;
+      $("vwaitSub").textContent = state.reveal ? "Le vote est terminé pour cette catégorie." : "Le vote va bientôt ouvrir…";
+      return;
+    }
+    $("vwait").classList.add("hidden"); $("vq").classList.remove("hidden");
+    $("vgrp").textContent = c.g; $("vprize").textContent = c.p; $("vdesc").textContent = c.d || "";
+    const staff = usesStaff(i);
+    $("search").classList.toggle("hidden", !staff);
+    if (lastQ !== i) { $("search").value = ""; lastQ = i; }
+    const f = $("search").value.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    const box = $("vopts"); box.innerHTML = "";
+    optionsFor(i).forEach((o) => {
+      if (f && !o.name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes(f)) return;
+      const b = document.createElement("button");
+      b.className = "opt" + (myVotes[i] === o.name ? " sel" : "");
+      b.innerHTML = esc(o.name) + (o.sub ? "<small>" + esc(o.sub) + "</small>" : "") + '<span class="chk">✔</span>';
+      b.disabled = !state.open;
+      b.onclick = () => vote(o.name);
+      box.appendChild(b);
+    });
+    const s = $("vstatus"); s.className = "status";
+    if (!state.open) { s.textContent = "Vote fermé — regardez l'écran ! 👀"; }
+    else if (myVotes[i] == null) { s.textContent = "Touchez un nom pour voter. Vous pouvez changer d'idée tant que le vote est ouvert."; }
+    else if (acked[i] === myVotes[i]) { s.className = "status ok"; s.textContent = "✓ Vote reçu : " + myVotes[i]; }
+    else { s.textContent = "Envoi du vote…"; }
+  }
+  $("search").addEventListener("input", () => render(false));
+  setTimeout(() => { if (!state) { $("vwaitMsg").textContent = "Connexion en cours…"; } }, 100);
+}
+
+/* ================================== ANIMATEUR ================================== */
+function startHost() {
+  $("host").classList.remove("hidden");
+  const voterUrl = location.origin + location.pathname + (TEST ? "?test" : "");
+  let state = load("hstate", { q: -1, open: false, reveal: false });
+  let votes = load("hvotes", {});           // votes[q][device] = nom
+  let seen = {};                            // device -> dernière activité
+  let live = load("hlive", false);
+  const tr = makeTransport(onMsg, (st) => {
+    $("hconn").innerHTML = st.map((on, k) => (on ? "🟢" : "🔴") + " serveur " + (k + 1)).join(" &nbsp; ");
+    if (st.some(Boolean)) pubState();
+  });
+  tr.sub(T("vote")); tr.sub(T("hello"));
+  function pubState() { tr.pub(T("state"), { q: state.q, open: state.open, reveal: state.reveal, t: Date.now() }, { retain: true }); }
+  setInterval(pubState, 15000);
+  setInterval(() => { const now = Date.now(); $("hpeople").textContent = Object.values(seen).filter((t) => now - t < 60000).length; }, 2000);
+  function onMsg(t, p) {
+    if (!p || !p.d) return;
+    seen[p.d] = Date.now();
+    if (t === T("vote")) {
+      const q = p.q;
+      if (typeof q !== "number" || !CATS[q]) return;
+      const valid = optionsFor(q).some((o) => o.name === p.c);
+      if (!valid) return;
+      if (state.open && state.q === q) {
+        votes[q] = votes[q] || {}; votes[q][p.d] = p.c; store("hvotes", votes);
+        drawBars(); drawList();
+      }
+      if (votes[q] && votes[q][p.d] === p.c) tr.pub(T("ack/" + p.d), { q, c: p.c });
+    }
+  }
+  function save() { store("hstate", state); pubState(); }
+  function go(i) { state = { q: Math.max(-1, Math.min(CATS.length - 1, i)), open: false, reveal: false }; save(); render(); }
+  function openVote() { if (state.q < 0) return; state.open = true; state.reveal = false; save(); render(); }
+  function closeReveal() { if (state.q < 0) return; state.open = false; state.reveal = true; save(); render(); }
+  function tally(i) {
+    const v = votes[i] || {}, counts = {};
+    Object.values(v).forEach((n) => (counts[n] = (counts[n] || 0) + 1));
+    let opts = optionsFor(i).map((o) => ({ name: o.name, n: counts[o.name] || 0 }));
+    if (usesStaff(i)) opts = opts.filter((o) => o.n > 0).sort((a, b) => b.n - a.n).slice(0, 8);
+    return { opts, total: Object.keys(v).length };
+  }
+  function qrSvg(url, cell) {
+    try { const q = qrcode(0, "M"); q.addData(url); q.make(); return q.createSvgTag({ cellSize: cell, margin: 2, scalable: true }); }
+    catch (e) { return '<div style="padding:20px">' + esc(url) + "</div>"; }
+  }
+  function render() {
+    const st = $("stage");
+    if (state.q < 0) {
+      st.innerHTML = '<div class="welcome"><div><h1>Gala des prix</h1><div class="gold">Party de Noël 2026</div>' +
+        "<p>Scannez le code QR avec votre téléphone pour voter en direct pour chaque catégorie.<br><br>Aucune application, aucun compte : votez, c'est tout !</p>" +
+        '<button class="cbtn pri" id="bStart">Commencer ▶</button></div>' +
+        '<div class="bigqr">' + qrSvg(voterUrl, 8) + '<div class="url">' + esc(voterUrl) + "</div></div></div>";
+      $("bStart").onclick = () => go(0);
+      drawList(); return;
+    }
+    const c = CATS[state.q];
+    st.innerHTML =
+      '<div class="grp">' + esc(c.g) + " · catégorie " + (state.q + 1) + " / " + CATS.length + (c.s ? " · ★" : "") + "</div>" +
+      '<div class="prize">' + esc(c.p) + "</div>" +
+      '<div class="desc">' + esc(c.d || "") + "</div>" +
+      '<div><span class="pill ' + (state.open ? "open" : "closed") + '">' + (state.open ? "● Vote ouvert" : state.reveal ? "Vote terminé" : "Vote pas encore ouvert") + "</span>" +
+      '<span class="pill cnt" id="cnt">0 vote</span>' + (usesStaff(state.q) ? '<span class="pill closed">Choix libre parmi toute l\'équipe</span>' : "") + "</div>" +
+      '<div class="bars" id="bars"></div><div id="win"></div>' +
+      '<div class="ctrls">' +
+      '<button class="cbtn sec" id="bPrev">◀</button>' +
+      (state.open ? '<button class="cbtn gold" id="bClose">Fermer et révéler 🏆</button>' : '<button class="cbtn pri" id="bOpen">' + (state.reveal ? "Rouvrir le vote" : "Ouvrir le vote") + "</button>") +
+      '<button class="cbtn sec" id="bNext">Suivante ▶</button>' +
+      '<button class="cbtn sec" id="bReset" title="Effacer les votes de cette catégorie">↺</button></div>' +
+      '<div class="qrbox">' + qrSvg(voterUrl, 4) + "Votez ici</div>";
+    $("bPrev").onclick = () => go(state.q - 1);
+    $("bNext").onclick = () => go(state.q + 1);
+    if ($("bOpen")) $("bOpen").onclick = openVote;
+    if ($("bClose")) $("bClose").onclick = closeReveal;
+    $("bReset").onclick = () => { if (confirmReset()) { delete votes[state.q]; store("hvotes", votes); drawBars(); drawList(); } };
+    drawBars(); drawList();
+  }
+  let resetArm = 0;
+  function confirmReset() { const now = Date.now(); if (now - resetArm < 2500) { resetArm = 0; return true; } resetArm = now; $("bReset").textContent = "Confirmer ?"; setTimeout(() => { if ($("bReset")) $("bReset").textContent = "↺"; }, 2500); return false; }
+  function drawBars() {
+    if (state.q < 0 || !$("bars")) return;
+    const { opts, total } = tally(state.q);
+    $("cnt").textContent = total + (total > 1 ? " votes" : " vote");
+    const show = state.reveal || live;
+    const max = Math.max(1, ...opts.map((o) => o.n));
+    const top = Math.max(0, ...opts.map((o) => o.n));
+    let list = opts.slice();
+    if (state.reveal) list.sort((a, b) => b.n - a.n);
+    const bars = $("bars");
+    if (!list.length) { bars.innerHTML = '<div class="desc">' + (show ? "Aucun vote pour l'instant." : "Les noms apparaîtront au dévoilement…") + "</div>"; }
+    else {
+      bars.innerHTML = list.map((o) => {
+        const win = state.reveal && top > 0 && o.n === top;
+        return '<div class="bar' + (win ? " win" : "") + (show ? "" : " hide") + '"><div class="nm">' + (win ? "👑 " : "") + esc(o.name) +
+          '</div><div class="trk"><div class="fill" data-w="' + (o.n / max) * 100 + '"></div></div><div class="num">' + (show ? o.n : "?") + "</div></div>";
+      }).join("");
+      requestAnimationFrame(() => bars.querySelectorAll(".fill").forEach((f) => (f.style.width = f.dataset.w + "%")));
+    }
+    const winners = opts.filter((o) => top > 0 && o.n === top).map((o) => o.name);
+    $("win").innerHTML = state.reveal && winners.length ? '<div class="winner">🏆 ' + esc(winners.join(" et ")) + (winners.length > 1 ? " (égalité !)" : "") + "</div>" : "";
+  }
+  function drawList() {
+    const L = $("list"); let g = null, h = "";
+    CATS.forEach((c, i) => {
+      if (c.g !== g) { g = c.g; h += '<div class="lg">' + esc(g) + "</div>"; }
+      const n = votes[i] ? Object.keys(votes[i]).length : 0;
+      h += '<div class="li' + (i === state.q ? " cur" : "") + '" data-i="' + i + '"><span class="n">' + (i + 1) + "</span><span>" + (c.s ? "★ " : "") + esc(c.p) + "</span>" + (n ? '<span class="v">' + n + "</span>" : "") + "</div>";
+    });
+    L.innerHTML = h;
+    L.querySelectorAll(".li").forEach((el) => (el.onclick = () => go(+el.dataset.i)));
+  }
+  $("bList").onclick = () => $("list").classList.toggle("hidden");
+  $("bHome").onclick = () => go(-1);
+  const liveLbl = () => ($("bLive").textContent = "Résultats en direct : " + (live ? "oui" : "non"));
+  $("bLive").onclick = () => { live = !live; store("hlive", live); liveLbl(); drawBars(); }; liveLbl();
+  $("bFull").onclick = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen());
+  $("bCsv").onclick = () => {
+    const rows = [["#", "Catégorie", "Prix", "Nom", "Votes"]];
+    CATS.forEach((c, i) => tally(i).opts.forEach((o) => rows.push([i + 1, c.g, c.p, o.name, o.n])));
+    const csv = "﻿" + rows.map((r) => r.map((x) => '"' + String(x).replace(/"/g, '""') + '"').join(";")).join("\n");
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = "resultats_gala_2026.csv"; a.click();
+  };
+  document.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "INPUT") return;
+    if (e.key === "ArrowRight" || e.key === "PageDown") go(state.q + 1);
+    else if (e.key === "ArrowLeft" || e.key === "PageUp") go(state.q - 1);
+    else if (e.key === " ") { e.preventDefault(); state.open ? closeReveal() : openVote(); }
+  });
+  render();
+}
+
+if (IS_HOST) startHost(); else startVoter();
+</script>
+</body>
+</html>
