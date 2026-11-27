@@ -67,6 +67,8 @@
   .pill{display:inline-block;padding:6px 14px;border-radius:999px;font-size:16px;font-weight:700;margin-right:10px}
   .pill.open{background:#3DDC84;color:#08321F}
   .pill.closed{background:rgba(255,255,255,.12);color:var(--cream)}
+  .noms{display:flex;flex-wrap:wrap;gap:14px;max-width:1100px;margin-top:28px}
+  .nom{background:var(--cream);color:var(--dark);border-radius:14px;padding:14px 24px;font-size:28px;font-weight:700}
   .winner{margin-top:26px;font-family:Cambria,Georgia,serif;font-size:44px;color:var(--gold)}
   .qrbox{position:absolute;right:28px;bottom:24px;background:#fff;border-radius:14px;padding:10px 10px 6px;text-align:center;color:var(--dark);font-size:13px;font-weight:700}
   .qrbox svg{display:block;width:150px;height:150px}
@@ -431,7 +433,12 @@ function startHost() {
   function confirmReset() { const now = Date.now(); if (now - resetArm < 2500) { resetArm = 0; return true; } resetArm = now; $("bReset").textContent = "Confirmer ?"; setTimeout(() => { if ($("bReset")) $("bReset").textContent = "↺"; }, 2500); return false; }
   function drawWinner() {
     if (state.q < 0 || !$("win")) return;
-    if (!state.reveal) { $("win").innerHTML = ""; return; }
+    if (!state.reveal) {
+      // Avant et pendant le vote : les personnes nommées, sans aucun résultat
+      $("win").innerHTML = usesStaff(state.q) ? "" :
+        '<div class="noms">' + CATS[state.q].n.map((n) => '<div class="nom">' + esc(n) + "</div>").join("") + "</div>";
+      return;
+    }
     const { opts } = tally(state.q);
     const top = Math.max(0, ...opts.map((o) => o.n));
     const winners = opts.filter((o) => top > 0 && o.n === top).map((o) => o.name);
