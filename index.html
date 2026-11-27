@@ -59,7 +59,6 @@
   #list .li.cur{background:var(--red);color:#fff}
   #list .li .n{color:var(--muted);min-width:24px}
   #list .li.cur .n{color:#fff}
-  #list .li .v{margin-left:auto;color:var(--gold);font-size:12px}
   #list .lg{font-size:11px;text-transform:uppercase;color:var(--gold);margin:14px 10px 4px;letter-spacing:.06em}
   .stage{flex:1;position:relative;padding:34px 48px 120px;overflow:auto}
   .stage .grp{font-size:18px}
@@ -68,16 +67,6 @@
   .pill{display:inline-block;padding:6px 14px;border-radius:999px;font-size:16px;font-weight:700;margin-right:10px}
   .pill.open{background:#3DDC84;color:#08321F}
   .pill.closed{background:rgba(255,255,255,.12);color:var(--cream)}
-  .pill.cnt{background:var(--gold);color:var(--dark)}
-  .bars{max-width:1100px;margin-top:18px}
-  .bar{display:flex;align-items:center;gap:16px;margin:12px 0}
-  .bar .nm{width:300px;font-size:24px;font-weight:600;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .bar .trk{flex:1;height:46px;background:rgba(255,255,255,.07);border-radius:12px;overflow:hidden}
-  .bar .fill{height:100%;background:var(--cream);border-radius:12px;width:0;transition:width .7s cubic-bezier(.2,.8,.2,1)}
-  .bar .num{width:70px;font-size:26px;font-weight:700;color:var(--gold)}
-  .bar.win .fill{background:var(--gold)}
-  .bar.win .nm{color:var(--gold)}
-  .bar.hide .fill{width:0!important}
   .winner{margin-top:26px;font-family:Cambria,Georgia,serif;font-size:44px;color:var(--gold)}
   .qrbox{position:absolute;right:28px;bottom:24px;background:#fff;border-radius:14px;padding:10px 10px 6px;text-align:center;color:var(--dark);font-size:13px;font-weight:700}
   .qrbox svg{display:block;width:150px;height:150px}
@@ -131,7 +120,6 @@
     <span class="sp"></span>
     <button class="hbtn" id="bList">☰ Catégories</button>
     <button class="hbtn" id="bHome">Accueil / code QR</button>
-    <button class="hbtn" id="bLive">Résultats en direct : non</button>
     <button class="hbtn" id="bCsv">Exporter (CSV)</button>
     <button class="hbtn" id="bFull">Plein écran</button>
   </div>
@@ -374,7 +362,6 @@ function startHost() {
   let state = load("hstate", { q: -1, open: false, reveal: false });
   let votes = load("hvotes", {});           // votes[q][device] = nom
   let seen = {};                            // device -> dernière activité
-  let live = load("hlive", false);
   const tr = makeTransport(onMsg, (st) => {
     $("hconn").innerHTML = st.map((on, k) => (on ? "🟢" : "🔴") + " serveur " + (k + 1)).join(" &nbsp; ");
     if (st.some(Boolean)) pubState();
@@ -393,7 +380,7 @@ function startHost() {
       if (!valid) return;
       if (state.open && state.q === q) {
         votes[q] = votes[q] || {}; votes[q][p.d] = p.c; store("hvotes", votes);
-        drawBars(); drawList();
+        drawWinner();
       }
       if (votes[q] && votes[q][p.d] === p.c) tr.pub(T("ack/" + p.d), { q, c: p.c });
     }
@@ -407,7 +394,7 @@ function startHost() {
     Object.values(v).forEach((n) => (counts[n] = (counts[n] || 0) + 1));
     let opts = optionsFor(i).map((o) => ({ name: o.name, n: counts[o.name] || 0 }));
     if (usesStaff(i)) opts = opts.filter((o) => o.n > 0).sort((a, b) => b.n - a.n).slice(0, 8);
-    return { opts, total: Object.keys(v).length };
+    return { opts };
   }
   function qrSvg(url, cell) {
     try { const q = qrcode(0, "M"); q.addData(url); q.make(); return q.createSvgTag({ cellSize: cell, margin: 2, scalable: true }); }
@@ -429,8 +416,8 @@ function startHost() {
       '<div class="prize">' + esc(c.p) + "</div>" +
       '<div class="desc">' + esc(c.d || "") + "</div>" +
       '<div><span class="pill ' + (state.open ? "open" : "closed") + '">' + (state.open ? "● Vote ouvert" : state.reveal ? "Vote terminé" : "Vote pas encore ouvert") + "</span>" +
-      '<span class="pill cnt" id="cnt">0 vote</span>' + (usesStaff(state.q) ? '<span class="pill closed">Choix libre parmi toute l\'équipe</span>' : "") + "</div>" +
-      '<div class="bars" id="bars"></div><div id="win"></div>' +
+      (usesStaff(state.q) ? '<span class="pill closed">Choix libre parmi toute l\'équipe</span>' : "") + "</div>" +
+      '<div id="win"></div>' +
       '<div class="ctrls">' +
       '<button class="cbtn sec" id="bPrev">◀</button>' +
       (state.open ? '<button class="cbtn gold" id="bClose">Fermer et révéler 🏆</button>' : '<button class="cbtn pri" id="bOpen">' + (state.reveal ? "Rouvrir le vote" : "Ouvrir le vote") + "</button>") +
@@ -441,47 +428,32 @@ function startHost() {
     $("bNext").onclick = () => go(state.q + 1);
     if ($("bOpen")) $("bOpen").onclick = openVote;
     if ($("bClose")) $("bClose").onclick = closeReveal;
-    $("bReset").onclick = () => { if (confirmReset()) { delete votes[state.q]; store("hvotes", votes); drawBars(); drawList(); } };
-    drawBars(); drawList();
+    $("bReset").onclick = () => { if (confirmReset()) { delete votes[state.q]; store("hvotes", votes); drawWinner(); } };
+    drawWinner(); drawList();
   }
   let resetArm = 0;
   function confirmReset() { const now = Date.now(); if (now - resetArm < 2500) { resetArm = 0; return true; } resetArm = now; $("bReset").textContent = "Confirmer ?"; setTimeout(() => { if ($("bReset")) $("bReset").textContent = "↺"; }, 2500); return false; }
-  function drawBars() {
-    if (state.q < 0 || !$("bars")) return;
-    const { opts, total } = tally(state.q);
-    $("cnt").textContent = total + (total > 1 ? " votes" : " vote");
-    const show = state.reveal || live;
-    const max = Math.max(1, ...opts.map((o) => o.n));
+  function drawWinner() {
+    if (state.q < 0 || !$("win")) return;
+    if (!state.reveal) { $("win").innerHTML = ""; return; }
+    const { opts } = tally(state.q);
     const top = Math.max(0, ...opts.map((o) => o.n));
-    let list = opts.slice();
-    if (state.reveal) list.sort((a, b) => b.n - a.n);
-    const bars = $("bars");
-    if (!list.length) { bars.innerHTML = '<div class="desc">' + (show ? "Aucun vote pour l'instant." : "Les noms apparaîtront au dévoilement…") + "</div>"; }
-    else {
-      bars.innerHTML = list.map((o) => {
-        const win = state.reveal && top > 0 && o.n === top;
-        return '<div class="bar' + (win ? " win" : "") + (show ? "" : " hide") + '"><div class="nm">' + (win ? "👑 " : "") + esc(o.name) +
-          '</div><div class="trk"><div class="fill" data-w="' + (o.n / max) * 100 + '"></div></div><div class="num">' + (show ? o.n : "?") + "</div></div>";
-      }).join("");
-      requestAnimationFrame(() => bars.querySelectorAll(".fill").forEach((f) => (f.style.width = f.dataset.w + "%")));
-    }
     const winners = opts.filter((o) => top > 0 && o.n === top).map((o) => o.name);
-    $("win").innerHTML = state.reveal && winners.length ? '<div class="winner">🏆 ' + esc(winners.join(" et ")) + (winners.length > 1 ? " (égalité !)" : "") + "</div>" : "";
+    $("win").innerHTML = winners.length
+      ? '<div class="winner">🏆 ' + esc(winners.join(" et ")) + (winners.length > 1 ? " (égalité !)" : "") + "</div>"
+      : '<div class="desc">Aucun vote pour cette catégorie.</div>';
   }
   function drawList() {
     const L = $("list"); let g = null, h = "";
     CATS.forEach((c, i) => {
       if (c.g !== g) { g = c.g; h += '<div class="lg">' + esc(g) + "</div>"; }
-      const n = votes[i] ? Object.keys(votes[i]).length : 0;
-      h += '<div class="li' + (i === state.q ? " cur" : "") + '" data-i="' + i + '"><span class="n">' + (i + 1) + "</span><span>" + (c.s ? "★ " : "") + esc(c.p) + "</span>" + (n ? '<span class="v">' + n + "</span>" : "") + "</div>";
+      h += '<div class="li' + (i === state.q ? " cur" : "") + '" data-i="' + i + '"><span class="n">' + (i + 1) + "</span><span>" + (c.s ? "★ " : "") + esc(c.p) + "</span></div>";
     });
     L.innerHTML = h;
     L.querySelectorAll(".li").forEach((el) => (el.onclick = () => go(+el.dataset.i)));
   }
   $("bList").onclick = () => $("list").classList.toggle("hidden");
   $("bHome").onclick = () => go(-1);
-  const liveLbl = () => ($("bLive").textContent = "Résultats en direct : " + (live ? "oui" : "non"));
-  $("bLive").onclick = () => { live = !live; store("hlive", live); liveLbl(); drawBars(); }; liveLbl();
   $("bFull").onclick = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen());
   $("bCsv").onclick = () => {
     const rows = [["#", "Catégorie", "Prix", "Nom", "Votes"]];
